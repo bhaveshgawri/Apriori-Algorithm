@@ -1,9 +1,60 @@
 #!/usr/bin/python3
+import os, operator
 from collections import defaultdict
 from itertools import combinations, chain
 
 
 class Apriori:
+	"""
+	Parameters
+	----------
+
+	minSupport: float
+				Minimum support value for a transaction
+				to be called interesting.
+	minConfidence: float
+				Minimum confidence for a rule to be called
+				interesting.
+	support_count: collection.defaultdict(int)
+				Contains support count of itemsets.
+				{
+					frozenset(): int,
+					frozenset(): int,
+					frozenset(): int,
+					...
+				}
+				frozenset(): set of items
+				int: support count of the itemset
+	
+	Methods
+	-------
+	read_transactions_from_file()
+		Read transactions from the input file.
+
+	get_one_itemset()
+		Gets unique items from the list of transactions.
+
+	self_cross()
+		Takes union of a set with itself to form bigger sets.
+
+	get_min_supp_itemsets()
+		Returns those itemsets whose support is > minSupport
+
+	apiori()
+		Uses Apriori algotithm to find interesting 
+		k-itemsets.
+
+	subsets()
+		Returns subsets of a set.
+	
+	get_rules()
+		Returns High confidence rules formed from k-itemsets
+
+	print_info()
+		Writes the rules and frequent itemsets with their 
+		support and confidence to a file.
+	"""
+
 	def __init__(self, minSupport=0.02, minConfidence=0.45):
 		self.support_count = defaultdict(int)
 		self.minSupport = minSupport
@@ -12,9 +63,21 @@ class Apriori:
 
 	def read_transactions_from_file(self, transaction_file):
 		"""
-		Desc: Reads the transaction file and returns a list
-		of transactions. Each transaction is represented as a
-		'set' of items.
+		Parameters
+		----------
+		transaction_file: csv file
+
+
+		Return Type
+		-----------
+		List of transactions as read from file.
+		Each transaction is a set of items.
+			[{a, b, c}, {b, d, p, q}, {p, e}, .....]
+
+			{a, b, c} - 1st itemset (3-itemset)
+			{b, d, p, q} - 2nd itemset (4-itemset)
+			{p, e} - 3rd itemset (2-itemset)
+			...
 		"""
 		with open (transaction_file, 'r') as infile:
 			transactions = [set(line.rstrip('\n').split(',')) 
@@ -24,27 +87,125 @@ class Apriori:
 
 
 	def get_one_itemset(self, transactions):
+		"""
+		Parameters
+		----------
+		List of transactions. Each transaction 
+		is a set of items.
+			[{a, b, c}, {b, d, p, q}, {p, e}, .....]
+		
+			{a, b, c} - 1st itemset (3-itemset)
+			{b, d, p, q} - 2nd itemset (4-itemset)
+			{p, e} - 3rd itemset (2-itemset)
+			...
+		
+		Return Type
+		-----------
+		one_itemset: set of unique items;
+			{
+				frozenset({'a'}), frozenset({'b'}), frozenset({'c'}), 
+				frozenset({'d'}), frozenset({'e'}), frozenset({'p'}), 
+				frozenset({'q'})
+			}
+		"""
 		one_itemset = set()
 		for transaction in transactions:
 			for item in transaction:
 				one_itemset.add(frozenset([item]))
+		
 		return one_itemset
 
 
 	def self_cross(self, Ck, itemset_size):
-		result = {itemset1.union(itemset2) 
+		"""
+		Parameters
+		----------
+		Ck: set
+			a set of k-itemsets
+			Size if each itemset in Ck is k(=itemset_size-1)
+
+		itemset_size: int
+			Required size of each itemset in resulting set(=k+1)
+
+		Ck:
+		{
+			frozenset({'book', 'pen'}),
+			frozenset({'book', 'dog'}),
+			frozenset({'ox', 'coke'}),
+			...
+		} 
+		for a 2-itemset
+		
+
+		Return Type
+		-----------
+		Ck_plus_1: set
+			a set of (k+1)-itemsets
+		
+		Ck_plus_1:
+		{
+			frozenset({'book', 'pen', 'dog'}),
+			frozenset({'book', 'dog', 'ox'}),
+			frozenset({'book', 'coke', 'dog'}),
+			...
+		}
+		"""
+		Ck_plus_1 = {itemset1.union(itemset2) 
 					for itemset1 in Ck for itemset2 in Ck 
 					if len(itemset1.union(itemset2)) == itemset_size}
-		return result
+		return Ck_plus_1
 
 
-	def prune_Ck(self, Ck, Lk, itemset_size):
+	def prune_Ck(self, Ck, Lk_minus_1, itemset_size):
+		"""
+		Parameters
+		----------
+		Ck: set
+			a set of k-itemsets(k=itemset_size)
+
+		Lk_minus_1: set
+			a set of (k-1)-itemsets
+
+		itemset_size: int
+			(= k)
+
+		Ck:
+		{
+			frozenset({'book', 'dog', 'copper'}),
+			frozenset({'book', 'dog', 'water'}),
+		}
+		Ck_minus_1:
+		{
+			frozenset({'book', 'dog'}),
+			frozenset({'book', 'copper'}),
+			frozenset({'dog', 'copper'})
+			frozenset({'book', 'water'}),
+			frozenset({'dog', 'water'}),
+		}
+		Lk_minus_1:
+		{
+			frozenset({'book', 'copper'}),
+			frozenset({'book', 'dog'}),
+			frozenset({'book', 'water'}),
+			frozenset({'water', 'dog'})
+		}
+
+		Returns
+		-------
+		Ck_: set
+			a set of k-itemsets
+		Ck_: 
+		{
+			frozenset({'book', 'dog', 'water'})
+		} those Ck's whose Ck_minus_1's are in Lk_minus_1
+		
+		"""
 		Ck_ = set()
 		for itemset in Ck:
-			subsets_of_itemset = list(combinations(itemset, itemset_size-1))
+			Ck_minus_1 = list(combinations(itemset, itemset_size-1))
 			flag = 0
-			for subset in subsets_of_itemset:
-				if not frozenset(subset) in Lk:
+			for subset in Ck_minus_1:
+				if not frozenset(subset) in Lk_minus_1:
 					flag = 1
 					break
 			if flag == 0:
@@ -54,9 +215,25 @@ class Apriori:
 
 	def get_min_supp_itemsets(self, Ck, transactions):
 		"""
-		Ck: candidate itemset with itemsets of width k
+		Parameters
+		----------
+		Ck: set
+			a set of k-itemsets
+		Transactions: list
+			list of transactions. Each transaction is
+			a set of items.
+			[{a, b, c}, {b, d, p, q}, {p, e}, .....]
+
+		Returns
+		-------
+		Lk: set
+			a set of k-itemsets
+			set of itemsets whose support is > minSupport
+
 		"""
 		temp_freq = defaultdict(int)
+		
+		# update support count of each itemset
 		for transaction in transactions:
 			for itemset in Ck:
 				if itemset.issubset(transaction):
@@ -64,12 +241,33 @@ class Apriori:
 					self.support_count[itemset] += 1
 
 		N = len(transactions)
-		result = [itemset for itemset, freq in temp_freq.items() 
+		Lk = [itemset for itemset, freq in temp_freq.items() 
 					if freq/N > self.minSupport]
-		return set(result)
+		return set(Lk)
 
 
 	def apiori(self, transactions):
+		"""
+		Parameters
+		----------
+		transactions: list
+			list of transactions. Each transaction is
+				a set of items.
+				[{a, b, c}, {b, d, p, q}, {p, e}, .....]
+
+		Returns
+		-------
+		K_itemsets: dict
+		{
+			1: {frozenset({'dog'}), frozenset({'ox'}), ....}
+			2: {frozenset({'dog', 'water'}), frozenset({'book', 'copper'}), .....}
+			3: {frozenset({'dog', 'ox', 'gold'}), frozenset({'water', 'dog', ox}), ...}
+		}
+			key: value
+			int: set of frozensets of size = value of key
+			
+			each itemset in K_itemset has support > minSupport
+		"""
 		K_itemsets = dict()
 		Ck = self.get_one_itemset(transactions)
 		Lk = self.get_min_supp_itemsets(Ck, transactions)
@@ -77,29 +275,62 @@ class Apriori:
 		while len(Lk) != 0:
 			K_itemsets[k-1] = Lk
 			Ck = self.self_cross(Lk, k)
-			# print(k, len(Ck))
+			print(k, len(Ck))
 			Ck = self.prune_Ck(Ck, Lk, k)
-			# print(k, len(Ck))
+			print(k, len(Ck))
 			Lk = self.get_min_supp_itemsets(Ck, transactions)
-			# print(k, len(Lk))
+			print(k, len(Lk))
 			k += 1
 
 		return K_itemsets
 
 
 	def subsets(self, iterable):
+		"""
+		Parameters
+		----------
+		iterable: an itearble container like set
+
+		Returns
+		-------
+		subsets_: list powerset of elements in the iterable container
+			[
+				frozenset(),
+				frozenset({a}), frozenset({b}),
+				frozenset({a, b})  
+			] if iterable is like {a, b}
+		"""
 		list_ = list(iterable)
 		subsets_ = chain.from_iterable(combinations(list_, len) 
 				for len in range(len(list_)+1))
-		return map(frozenset, subsets_)
+		subsets_ = list(map(frozenset, subsets_))
+		
+		return subsets_
+
 
 	def get_rules(self, K_itemsets):
+		"""
+		Parameters
+		----------
+		K_itemset: dict
+			{key: value}
+			{int: set of frozensets of size = value of key}
+			
+			each itemset in K_itemset has support > minSupport
+
+		Returns
+		-------
+		rules: list of tuples
+			Confidence of each returned rule is > minConfidence
+		rule: left -> right
+		tuple: (left, right, confidence of rule)
+		"""
 		rules = list()
 		for key, k_itemset in K_itemsets.items():
 			if key > 1:
 				for itemset in k_itemset:
 					sub_itemsets = \
-					{subset for subset in list(self.subsets(itemset)) 
+					{subset for subset in self.subsets(itemset) 
 						if (subset != set() and len(subset) != len(itemset))}
 					for subset in sub_itemsets:
 						left = subset
@@ -107,28 +338,48 @@ class Apriori:
 						confidence = self.support_count[itemset]/self.support_count[left]
 						if (confidence > self.minConfidence):
 							rules.append((list(left), list(right), confidence))
+
+		rules.sort(key=operator.itemgetter(2), reverse=True)
 		return rules
 
-	def print_info(self, K_itemsets, rules, transactions_count):
+	def write_info(self, K_itemsets, rules, transactions_count):
+		"""
+		Writes the rules and frequent itemsets with their 
+		support and confidence to a file.
+		"""
 		N = transactions_count
-		print('Frequnet Itemsets:')
-		for key, values in K_itemsets.items():
-			print('\n'+str(key)+'-itemsets:')
-			for value in values:
-				support = self.support_count[value]/N
-				print(list(value), support)
+		main_dir = './results/'
+		if not os.path.exists(main_dir):
+			os.makedirs(main_dir)
 
-		print('\nRules:\n([left], [right], [confidence])')
-		for rule in rules:
-			print(rule)
-		
+		outfile_path = './results/s='+str(self.minSupport)+' c='+str(self.minConfidence)
+		with open (outfile_path, 'w') as outfile:
+			outfile.write('Frequnet Itemsets:')
+			tot_itemset_count = 0
+			for key, values in K_itemsets.items():
+				outfile.write('\n'+str(key)+'-itemsets:\n')
+				count = 0
+				for value in values:
+					support = self.support_count[value]/N
+					count += 1
+					tot_itemset_count += 1
+					outfile.write(str(list(value))+' | support: '+str(support)+'\n')
+				outfile.write('Count: '+str(count)+'\n\n')
+
+			outfile.write('Total number of frequent itemset(s): '+str(tot_itemset_count)+'\n')
+			outfile.write('\n\nRules:\n')
+
+			for rule in rules:
+				outfile.write(str(rule[0])+' -> '+str(rule[1])+' | confidence: '+str(rule[2])+'\n')
+			outfile.write('\nTotal number of rules: '+str(len(rules))+'\n')
+			
 
 if __name__ == '__main__':
 	in_transaction_file = "./groceries.csv"	
 
 	ap = Apriori()
-	# ap = Apriori(minSupport, minConfidence)
+	# ap = Apriori(0.01, 0.5)
 	transactions = ap.read_transactions_from_file(in_transaction_file)
 	K_itemsets = ap.apiori(transactions)
 	rules = ap.get_rules(K_itemsets)
-	ap.print_info(K_itemsets, rules, len(transactions))
+	ap.write_info(K_itemsets, rules, len(transactions))
