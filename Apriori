@@ -342,6 +342,7 @@ class Apriori:
 		rules.sort(key=operator.itemgetter(2), reverse=True)
 		return rules
 
+
 	def write_info(self, K_itemsets, rules, transactions_count):
 		"""
 		Writes the rules and frequent itemsets with their 
@@ -361,24 +362,28 @@ class Apriori:
 				count = 0
 				for value in values:
 					support = self.support_count[value]/N
+					support_ct = self.support_count[value]
 					count += 1
 					tot_itemset_count += 1
-					outfile.write(str(list(value))+' | support: '+str(support)+'\n')
+					outfile.write(str(list(value))+' | support: '+str(support_ct)+'\n')
 				outfile.write('Count: '+str(count)+'\n\n')
 
 			outfile.write('Total number of frequent itemset(s): '+str(tot_itemset_count)+'\n')
 			outfile.write('\n\nRules:\n')
 
 			for rule in rules:
-				outfile.write(str(rule[0])+' -> '+str(rule[1])+' | confidence: '+str(rule[2])+'\n')
+				support_l = self.support_count[frozenset(rule[0])]
+				support_r = self.support_count[frozenset(rule[1])]
+				outfile.write(str(rule[0])+'('+str(support_l)+')'+' -> '+str(rule[1])+ \
+							'('+str(support_r)+')'+' | confidence: '+str(rule[2])+'\n')
 			outfile.write('\nTotal number of rules: '+str(len(rules))+'\n')
 			
 
 if __name__ == '__main__':
 	in_transaction_file = "./groceries.csv"	
 
-	ap = Apriori()
-	# ap = Apriori(0.01, 0.5)
+	# ap = Apriori()	
+	ap = Apriori(minSupport=0.02, minConfidence=0.45)
 	transactions = ap.read_transactions_from_file(in_transaction_file)
 	K_itemsets = ap.apiori(transactions)
 	rules = ap.get_rules(K_itemsets)
