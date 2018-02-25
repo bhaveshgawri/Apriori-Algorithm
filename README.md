@@ -34,7 +34,7 @@ $ ./Apriori
 >All the parameters can be changed from within the code.
 
 ## Output:
->In a file `s=0.001 c=0.95`
+>In a file `s=0.01 c=0.5`
 
 ```
 Frequnet Itemsets:
